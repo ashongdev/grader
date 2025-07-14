@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import CourseResults from "./pages/CourseResults";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
@@ -32,6 +33,10 @@ const App = () => (
 								<Route path="/upload" element={<Upload />} />
 								<Route path="/results" element={<Results />} />
 								<Route
+									path="/results/:courseId"
+									element={<CourseResults />}
+								/>
+								<Route
 									path="/settings"
 									element={<Settings />}
 								/>
@@ -39,14 +44,14 @@ const App = () => (
 									path="/set-answer-key"
 									element={<SetAnswerKey />}
 								/>
+								<Route
+									path="/view-answer-keys"
+									element={<ViewAnswerKeys />}
+								/>
 								<Route path="/login" element={<Login />} />
 								<Route
 									path="/register"
 									element={<Register />}
-								/>
-								<Route
-									path="/view-answer-keys"
-									element={<ViewAnswerKeys />}
 								/>
 								<Route path="*" element={<NotFound />} />
 							</Routes>

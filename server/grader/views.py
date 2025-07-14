@@ -39,8 +39,8 @@ def save_answer_key(request):
             author,
         ]
     ):
-        # if negative_marking is None:
-        #     print("negative_marking is missing!")
+        if negative_marking is None:
+            return Response({"error": "Missing required values"}, status=400)
 
         return Response({"error": "Missing required values"}, status=400)
 
@@ -82,7 +82,7 @@ def save_answer_key(request):
 
 
 @api_view(["GET"])
-def keys(request, email):
+def keys(_, email):
     user = User.objects.get(username=email)
     keys = AnswerKey.objects.filter(author=user)
 
@@ -96,15 +96,92 @@ def keys(request, email):
                 "courseCode": key.course_code,
                 "numQuestions": key.no_of_questions,
                 "courseName": key.course_name,
-                "grading_scale": key.grading_scale,
+                "gradingScale": key.grading_scale,
                 "answerKey": key.keys,
                 "dateAdded": key.created_at,
-                "updated_at": key.updated_at,
+                "updatedAt": key.updated_at,
                 "negativeMarking": s.negative_marking,  # type: ignore
                 "totalMarks": key.total_marks,
+                "markPerQuestion": key.mark_per_question,
             }
         )
     return Response(answer_keys, status=200)
+
+
+@api_view(["PATCH"])
+def edit_answer_key(request):
+    data = request.data
+
+    if not data:
+        return Response({"error": "Missing cleanAnswerKey"}, status=400)
+
+    id = data["id"]
+    answer_key = data["answerKey"]
+    course_code = data["courseCode"]
+    course_name = data["courseName"]
+    num_of_questions = data["numQuestions"]
+    negative_marking = data["negativeMarking"]
+    grading_scale = data["gradingScale"]
+    total_marks = data["totalMarks"]
+    author = data["author"]
+
+    if any(
+        v in [None, ""]
+        for v in [
+            answer_key,
+            course_code,
+            course_name,
+            num_of_questions,
+            grading_scale,
+            author,
+        ]
+    ):
+        if negative_marking is None:
+            return Response({"error": "Missing required values"}, status=400)
+
+        return Response({"error": "Missing required values"}, status=400)
+
+    try:
+        author_obj = User.objects.get(username=author)
+    except User.DoesNotExist:
+        return Response({"message": "Unauthorized request"}, status=400)
+    else:
+        a = AnswerKey.objects.filter(id=id, author=author_obj)
+
+        # Update answer key
+        a.update(
+            course_code=course_code,
+            course_name=course_name,
+            no_of_questions=num_of_questions,
+            keys=answer_key,
+            total_marks=total_marks,
+        )
+
+        # Update setting for answer key
+        s = Setting.objects.filter(answer_key=a.last())
+        s.update(negative_marking=negative_marking)
+
+        return Response({"message": "Answer Key Updated"}, status=200)
+
+
+@api_view(["POST"])
+def delete_answer_key(request):
+    data = request.data
+    id = data.get("id")
+    author = data.get("author")
+
+    if author is None:
+        return Response({"error": "Unauthorized Access"}, status=401)
+
+    try:
+        author_obj = User.objects.get(username=author)
+    except User.DoesNotExist:
+        return Response({"message": "Unauthorized request"}, status=400)
+    else:
+        a = AnswerKey.objects.filter(id=id, author=author_obj)
+        a.delete()
+
+        return Response({"message": "Answer Key Deleted"}, status=200)
 
 
 @api_view(["POST"])
@@ -128,7 +205,6 @@ def logout_view(request):
 
 @api_view(["POST"])
 def register(request):
-    print(request.data)
     email = request.data.get("email")
 
     # Ensure password matches confirmation

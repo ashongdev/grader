@@ -51,6 +51,7 @@ interface AnswerKey {
 	answerKey: string;
 	negativeMarking: boolean;
 	totalMarks: number;
+	markPerQuestion: number;
 }
 
 // Mock data - in a real app, this would come from your backend
@@ -101,12 +102,39 @@ const ViewAnswerKeys = () => {
 			key.courseName.toLowerCase().includes(searchTerm.toLowerCase())
 	);
 
-	const handleDelete = (id: string) => {
-		setAnswerKeys(answerKeys.filter((key) => key.id !== id));
-		toast({
-			title: "Answer Key Deleted",
-			description: "The answer key has been removed successfully.",
-		});
+	const handleDelete = async (id: string) => {
+		try {
+			const response = await axios.post(
+				`http://localhost:8000/api/user/delete`,
+				{ id, author: JSON.parse(localStorage.getItem("user")) },
+				{
+					headers: {
+						"Content-Type": "application/json",
+					},
+				}
+			);
+
+			if (response.data) {
+				setAnswerKeys(answerKeys.filter((key) => key.id !== id));
+				toast({
+					title: "Answer Key Deleted",
+					description:
+						"The answer key has been removed successfully.",
+				});
+			}
+		} catch (error) {
+			const message =
+				error?.response?.data?.message || "Unexpected error";
+			const status = error?.response?.status || "Error";
+
+			console.log("🚀 ~ onSubmit ~ error:", error);
+
+			toast({
+				title: `Status: ${status}`,
+				description: message,
+				variant: "destructive",
+			});
+		}
 	};
 
 	const handleExport = (answerKey: AnswerKey) => {
@@ -143,7 +171,13 @@ const ViewAnswerKeys = () => {
 		setEditForm({ ...answerKey });
 	};
 
-	const handleSaveEdit = () => {
+	useEffect(() => {
+		const calculatedTotalMarks =
+			editForm.numQuestions * editForm.markPerQuestion;
+		setEditForm((prev) => ({ ...prev, totalMarks: calculatedTotalMarks }));
+	}, [editForm.numQuestions, editForm.markPerQuestion]);
+
+	const handleSaveEdit = async () => {
 		if (!editingId || !editForm) return;
 
 		// Validate answer key length
@@ -158,21 +192,51 @@ const ViewAnswerKeys = () => {
 			return;
 		}
 
-		setAnswerKeys(
-			answerKeys.map((key) =>
-				key.id === editingId
-					? { ...key, ...editForm, answerKey: cleanAnswerKey }
-					: key
-			)
-		);
+		try {
+			const response = await axios.patch(
+				`http://localhost:8000/api/user/edit`,
+				{
+					...editForm,
+					author: JSON.parse(localStorage.getItem("user")),
+				},
+				{
+					headers: {
+						"Content-Type": "application/json",
+					},
+				}
+			);
 
-		setEditingId(null);
-		setEditForm({});
+			if (response.data) {
+				setAnswerKeys(
+					answerKeys.map((key) =>
+						key.id === editingId
+							? { ...key, ...editForm, answerKey: cleanAnswerKey }
+							: key
+					)
+				);
 
-		toast({
-			title: "Answer Key Updated",
-			description: "The answer key has been updated successfully.",
-		});
+				setEditingId(null);
+				setEditForm({});
+
+				toast({
+					title: "Answer Key Updated",
+					description:
+						"The answer key has been updated successfully.",
+				});
+			}
+		} catch (error) {
+			const message =
+				error?.response?.data?.message || "Unexpected error";
+			const status = error?.response?.status || "Error";
+
+			console.log("🚀 ~ onSubmit ~ error:", error);
+
+			toast({
+				title: `Status: ${status}`,
+				description: message,
+				variant: "destructive",
+			});
+		}
 	};
 
 	const handleCancelEdit = () => {
@@ -410,6 +474,7 @@ const ViewAnswerKeys = () => {
 												{editingId === answerKey.id ? (
 													<Input
 														type="number"
+														disabled
 														value={
 															editForm.totalMarks ||
 															""
