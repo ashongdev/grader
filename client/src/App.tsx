@@ -7,14 +7,14 @@ import { FontSizeProvider } from "@/hooks/use-font-size";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import CourseResults from "./pages/CourseResults";
+import CourseSubmissions from "./pages/CourseSubmissions";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import Register from "./pages/Register";
-import Results from "./pages/Results";
 import SetAnswerKey from "./pages/SetAnswerKey";
 import Settings from "./pages/Settings";
+import Results from "./pages/Submissions";
 import Upload from "./pages/Upload";
 import ViewAnswerKeys from "./pages/ViewAnswerKeys";
 const queryClient = new QueryClient();
@@ -44,12 +44,12 @@ const App = () => (
 											element={<Upload />}
 										/>
 										<Route
-											path="/results"
+											path="/submissions"
 											element={<Results />}
 										/>
 										<Route
-											path="/results/:courseId"
-											element={<CourseResults />}
+											path="/submissions/:courseCode"
+											element={<CourseSubmissions />}
 										/>
 										<Route
 											path="/settings"

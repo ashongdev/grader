@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -9,99 +8,85 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import Spinner from "@/components/ui/spinner";
+import { useToast } from "@/hooks/use-toast";
+import axios from "axios";
 import { Eye, FileText, Plus, Search, TrendingUp, Users } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-interface Course {
-	id: string;
+type Course = {
+	id: number;
 	courseCode: string;
 	courseName: string;
 	totalSubmissions: number;
-	averageScore: number;
 	lastActivity: string;
-	status: "active" | "completed" | "draft";
-}
+	averageScore: string;
+};
 
-// Mock data - in real app this would come from API
-const mockCourses: Course[] = [
-	{
-		id: "1",
-		courseCode: "CS101",
-		courseName: "Introduction to Computer Science",
-		totalSubmissions: 25,
-		averageScore: 82.5,
-		lastActivity: "2024-01-15",
-		status: "active",
-	},
-	{
-		id: "2",
-		courseCode: "MATH201",
-		courseName: "Calculus II",
-		totalSubmissions: 18,
-		averageScore: 76.3,
-		lastActivity: "2024-01-14",
-		status: "active",
-	},
-	{
-		id: "3",
-		courseCode: "PHYS301",
-		courseName: "Advanced Physics",
-		totalSubmissions: 12,
-		averageScore: 89.1,
-		lastActivity: "2024-01-13",
-		status: "completed",
-	},
-	{
-		id: "4",
-		courseCode: "ENG102",
-		courseName: "English Composition",
-		totalSubmissions: 0,
-		averageScore: 0,
-		lastActivity: "2024-01-10",
-		status: "draft",
-	},
-];
+type SubmissionsData = {
+	totalSubmissions: number;
+	totalCourses: number;
+	overallAverage: string;
+	courseList: Course[];
+};
 
-const Results = () => {
-	const [courses] = useState<Course[]>(mockCourses);
+const Submissions = () => {
+	const [courses, setCourses] = useState<SubmissionsData | null>(null);
 	const [searchTerm, setSearchTerm] = useState("");
+	const { toast } = useToast();
+	const [loading, setLoading] = useState(true);
 
-	const filteredCourses = courses.filter(
-		(course) =>
-			course.courseCode
-				.toLowerCase()
-				.includes(searchTerm.toLowerCase()) ||
-			course.courseName.toLowerCase().includes(searchTerm.toLowerCase())
-	);
+	const filteredCourses =
+		courses &&
+		courses.courseList &&
+		courses.courseList.filter(
+			(course) =>
+				course?.courseCode
+					.toLowerCase()
+					.includes(searchTerm.toLowerCase()) ||
+				course?.courseName
+					.toLowerCase()
+					.includes(searchTerm.toLowerCase())
+		);
 
-	const getStatusColor = (status: string) => {
-		switch (status) {
-			case "active":
-				return "bg-green-100 text-green-800";
-			case "completed":
-				return "bg-blue-100 text-blue-800";
-			case "draft":
-				return "bg-gray-100 text-gray-800";
-			default:
-				return "bg-gray-100 text-gray-800";
+	const fetchSubmissions = async () => {
+		try {
+			setLoading(true);
+			const response = await axios.get(
+				"http://localhost:8000/api/user/courses",
+				{
+					params: {
+						id: JSON.parse(localStorage.getItem("user")),
+					},
+				}
+			);
+
+			if (response.data) {
+				setCourses(response.data);
+			}
+		} catch (error) {
+			toast({
+				title: "Unexpected Error",
+				description: "An unexpected error occurred. Please try again.",
+				variant: "destructive",
+			});
+		} finally {
+			setLoading(false);
 		}
 	};
 
-	const totalSubmissions = courses.reduce(
-		(sum, course) => sum + course.totalSubmissions,
-		0
-	);
-	const activeCourses = courses.filter(
-		(course) => course.status === "active"
-	).length;
-	const overallAverage =
-		courses.filter((c) => c.totalSubmissions > 0).length > 0
-			? courses
-					.filter((c) => c.totalSubmissions > 0)
-					.reduce((sum, course) => sum + course.averageScore, 0) /
-			  courses.filter((c) => c.totalSubmissions > 0).length
-			: 0;
+	useEffect(() => {
+		fetchSubmissions();
+	}, []);
+
+	if (loading) {
+		return (
+			<div className="flex flex-col min-h-screen justify-center items-center">
+				<Spinner />
+			</div>
+		);
+	}
 
 	return (
 		<div className="flex flex-col min-h-screen">
@@ -112,10 +97,10 @@ const Results = () => {
 						<SidebarTrigger />
 						<div>
 							<h1 className="text-2xl font-bold text-foreground">
-								Course Results
+								Submissions
 							</h1>
 							<p className="text-muted-foreground">
-								View and manage results for all your courses
+								View and manage submissions for all your courses
 							</p>
 						</div>
 					</div>
@@ -148,22 +133,11 @@ const Results = () => {
 						</CardHeader>
 						<CardContent>
 							<div className="text-2xl font-bold">
-								{courses.length}
+								{courses?.totalCourses || 0}
 							</div>
 						</CardContent>
 					</Card>
-					<Card>
-						<CardHeader className="pb-2">
-							<CardTitle className="text-sm font-medium">
-								Active Courses
-							</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<div className="text-2xl font-bold">
-								{activeCourses}
-							</div>
-						</CardContent>
-					</Card>
+
 					<Card>
 						<CardHeader className="pb-2">
 							<CardTitle className="text-sm font-medium">
@@ -172,7 +146,7 @@ const Results = () => {
 						</CardHeader>
 						<CardContent>
 							<div className="text-2xl font-bold">
-								{totalSubmissions}
+								{courses?.totalSubmissions || 0}
 							</div>
 						</CardContent>
 					</Card>
@@ -184,7 +158,9 @@ const Results = () => {
 						</CardHeader>
 						<CardContent>
 							<div className="text-2xl font-bold">
-								{overallAverage.toFixed(1)}%
+								{Number(courses?.overallAverage).toFixed(1) ||
+									0}
+								%
 							</div>
 						</CardContent>
 					</Card>
@@ -213,7 +189,7 @@ const Results = () => {
 
 				{/* Courses Grid */}
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-					{filteredCourses.length === 0 ? (
+					{filteredCourses && filteredCourses.length === 0 ? (
 						<div className="col-span-full">
 							<Card>
 								<CardContent className="pt-6">
@@ -234,28 +210,22 @@ const Results = () => {
 							</Card>
 						</div>
 					) : (
+						filteredCourses &&
 						filteredCourses.map((course) => (
 							<Card
-								key={course.id}
+								key={course?.id}
 								className="hover:shadow-md transition-shadow cursor-pointer"
 							>
 								<CardHeader>
 									<div className="flex items-start justify-between">
 										<div>
 											<CardTitle className="text-lg">
-												{course.courseCode}
+												{course?.courseCode}
 											</CardTitle>
 											<CardDescription className="mt-1">
-												{course.courseName}
+												{course?.courseName}
 											</CardDescription>
 										</div>
-										<Badge
-											className={getStatusColor(
-												course.status
-											)}
-										>
-											{course.status}
-										</Badge>
 									</div>
 								</CardHeader>
 								<CardContent>
@@ -264,16 +234,16 @@ const Results = () => {
 											<div className="flex items-center gap-2">
 												<Users className="h-4 w-4 text-muted-foreground" />
 												<span>
-													{course.totalSubmissions}{" "}
+													{course?.totalSubmissions}{" "}
 													submissions
 												</span>
 											</div>
 											<div className="flex items-center gap-2">
 												<TrendingUp className="h-4 w-4 text-muted-foreground" />
 												<span>
-													{course.averageScore.toFixed(
-														1
-													)}
+													{Number(
+														course?.averageScore
+													).toFixed(1) || 0.0}
 													% avg
 												</span>
 											</div>
@@ -281,26 +251,24 @@ const Results = () => {
 
 										<div className="text-xs text-muted-foreground">
 											Last activity:{" "}
-											{new Date(
-												course.lastActivity
-											).toLocaleDateString()}
+											{course?.lastActivity}
 										</div>
 
 										<div className="flex gap-2">
 											<Link
-												to={`/results/${course.id}`}
+												to={`/submissions/${course?.courseCode.toLowerCase()}`}
 												className="flex-1"
 											>
 												<Button
 													variant="outline"
 													className="w-full"
 													disabled={
-														course.totalSubmissions ===
+														course?.totalSubmissions ===
 														0
 													}
 												>
 													<Eye className="mr-2 h-4 w-4" />
-													View Results
+													View Submissions
 												</Button>
 											</Link>
 										</div>
@@ -315,4 +283,4 @@ const Results = () => {
 	);
 };
 
-export default Results;
+export default Submissions;

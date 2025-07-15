@@ -33,7 +33,7 @@ import {
 const mainItems = [
 	{ title: "Dashboard", url: "/", icon: Home },
 	{ title: "Upload Sheets", url: "/upload", icon: Upload },
-	{ title: "Results", url: "/results", icon: BarChart3 },
+	{ title: "Submissions", url: "/submissions", icon: BarChart3 },
 ];
 
 const answerKeyItems = [

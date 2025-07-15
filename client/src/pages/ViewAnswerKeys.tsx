@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import Spinner from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import {
 	Table,
@@ -54,46 +55,13 @@ interface AnswerKey {
 	markPerQuestion: number;
 }
 
-// Mock data - in a real app, this would come from your backend
-const mockAnswerKeys: AnswerKey[] = [
-	// {
-	// 	id: "1",
-	// 	courseCode: "CS101",
-	// 	courseName: "Introduction to Computer Science",
-	// 	dateAdded: "2024-01-15",
-	// 	numQuestions: 50,
-	// 	answerKey: "ABCDABCDABCDABCDABCDABCDABCDABCDABCDABCDABCDABCDAB",
-	// 	negativeMarking: true,
-	// 	totalMarks: 100,
-	// },
-	// {
-	// 	id: "2",
-	// 	courseCode: "MATH201",
-	// 	courseName: "Calculus II",
-	// 	dateAdded: "2024-01-10",
-	// 	numQuestions: 30,
-	// 	answerKey: "BCADABCDABCDABCDABCDABCDABCDAB",
-	// 	negativeMarking: false,
-	// 	totalMarks: 75,
-	// },
-	// {
-	// 	id: "3",
-	// 	courseCode: "PHYS301",
-	// 	courseName: "Advanced Physics",
-	// 	dateAdded: "2024-01-08",
-	// 	numQuestions: 40,
-	// 	answerKey: "ADCBADCBADCBADCBADCBADCBADCBADCBADCBADCB",
-	// 	negativeMarking: true,
-	// 	totalMarks: 120,
-	// },
-];
-
 const ViewAnswerKeys = () => {
 	const [answerKeys, setAnswerKeys] = useState<AnswerKey[]>([]);
 	const [searchTerm, setSearchTerm] = useState("");
 	const [selectedKey, setSelectedKey] = useState<AnswerKey | null>(null);
 	const [editingId, setEditingId] = useState<string | null>(null);
 	const [editForm, setEditForm] = useState<Partial<AnswerKey>>({});
+	const [loading, setLoading] = useState(false);
 	const { toast } = useToast();
 
 	const filteredKeys = answerKeys.filter(
@@ -255,6 +223,7 @@ const ViewAnswerKeys = () => {
 
 	const fetchAnswerKeys = async () => {
 		try {
+			setLoading(true);
 			const email = JSON.parse(localStorage.getItem("user"));
 			const response = await axios.get(
 				`http://localhost:8000/api/user/keys/${email}`
@@ -278,11 +247,21 @@ const ViewAnswerKeys = () => {
 				title: `Status: ${error.status}`,
 				description: `${message}`,
 			});
+		} finally {
+			setLoading(false);
 		}
 	};
 	useEffect(() => {
 		fetchAnswerKeys();
 	}, []);
+
+	if (loading) {
+		return (
+			<div className="flex flex-col min-h-screen justify-center items-center">
+				<Spinner />
+			</div>
+		);
+	}
 
 	return (
 		<div className="flex flex-col min-h-screen">

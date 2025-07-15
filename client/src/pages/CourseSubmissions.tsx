@@ -7,7 +7,9 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import Spinner from "@/components/ui/spinner";
 import {
 	Table,
 	TableBody,
@@ -16,15 +18,18 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import axios from "axios";
 import {
 	ArrowLeft,
 	CheckCircle,
 	Download,
 	Eye,
 	FileSpreadsheet,
+	Search,
 	XCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 interface StudentResult {
@@ -40,198 +45,92 @@ interface StudentResult {
 	timeProcessed: string;
 }
 
-interface Course {
-	id: string;
-	courseCode: string;
-	courseName: string;
-	// answerKey: string;
-	// dateAdded: Date;
-	// gradingScale: "STD" | "NUM" | "CUS";
-	// markPerQuestion: number;
-	// negativeMarking: boolean;
-	// numQuestions: number;
-	// totalMarks: number;
-	// updatedAt: Date;
-}
-
-// Mock data - in real app this would come from API
-const mockCourses: Course[] = [
-	{
-		id: "1",
-		courseCode: "CS101",
-		courseName: "Introduction to Computer Science",
-	},
-	{ id: "2", courseCode: "MATH201", courseName: "Calculus II" },
-	{ id: "3", courseCode: "PHYS301", courseName: "Advanced Physics" },
-];
-
-const mockResults: Record<string, StudentResult[]> = {
-	"1": [
-		{
-			id: "1",
-			studentName: "Alice Johnson",
-			studentId: "ST001",
-			score: 18,
-			totalQuestions: 20,
-			percentage: 90,
-			answers: [
-				"A",
-				"B",
-				"C",
-				"D",
-				"A",
-				"B",
-				"C",
-				"D",
-				"A",
-				"B",
-				"C",
-				"D",
-				"A",
-				"B",
-				"C",
-				"D",
-				"A",
-				"B",
-				"C",
-				"D",
-			],
-			correctAnswers: [
-				"A",
-				"B",
-				"C",
-				"D",
-				"A",
-				"B",
-				"C",
-				"D",
-				"A",
-				"B",
-				"C",
-				"D",
-				"A",
-				"B",
-				"C",
-				"D",
-				"A",
-				"C",
-				"C",
-				"D",
-			],
-			grade: "A",
-			timeProcessed: "2024-01-15 10:30 AM",
-		},
-		{
-			id: "2",
-			studentName: "Bob Smith",
-			studentId: "ST002",
-			score: 15,
-			totalQuestions: 20,
-			percentage: 75,
-			answers: [
-				"A",
-				"B",
-				"C",
-				"A",
-				"A",
-				"B",
-				"C",
-				"D",
-				"A",
-				"B",
-				"C",
-				"D",
-				"A",
-				"B",
-				"C",
-				"D",
-				"A",
-				"B",
-				"C",
-				"D",
-			],
-			correctAnswers: [
-				"A",
-				"B",
-				"C",
-				"D",
-				"A",
-				"B",
-				"C",
-				"D",
-				"A",
-				"B",
-				"C",
-				"D",
-				"A",
-				"B",
-				"C",
-				"D",
-				"A",
-				"C",
-				"C",
-				"D",
-			],
-			grade: "B",
-			timeProcessed: "2024-01-15 10:32 AM",
-		},
-	],
-	"2": [
-		{
-			id: "3",
-			studentName: "Carol Davis",
-			studentId: "ST003",
-			score: 12,
-			totalQuestions: 15,
-			percentage: 80,
-			answers: [
-				"A",
-				"A",
-				"C",
-				"D",
-				"A",
-				"B",
-				"C",
-				"D",
-				"A",
-				"B",
-				"C",
-				"D",
-				"A",
-				"B",
-				"C",
-			],
-			correctAnswers: [
-				"A",
-				"B",
-				"C",
-				"D",
-				"A",
-				"B",
-				"C",
-				"D",
-				"A",
-				"B",
-				"C",
-				"D",
-				"A",
-				"B",
-				"C",
-			],
-			grade: "B",
-			timeProcessed: "2024-01-15 10:35 AM",
-		},
-	],
+type Submission = {
+	id: number;
+	studentId: number;
+	studentName: string;
+	score: number;
+	percentage: number;
+	grade: string;
+	answers: string[];
+	timeProcessed: string;
 };
 
-const CourseResults = () => {
-	const { courseId } = useParams<{ courseId: string }>();
-	const [selectedResult, setSelectedResult] = useState<StudentResult | null>(
+type CourseReport = {
+	courseName: string;
+	courseCode: string;
+	totalSubmissions: number;
+	averageScore: string;
+	highestScore: number;
+	passRate: number;
+	numOfQuestions: number;
+	correctAnswers: string;
+	submissions: Submission[];
+};
+
+const CourseSubmissions = () => {
+	const { courseCode } = useParams<{ courseCode: string }>();
+	const [course, setCourse] = useState<CourseReport>();
+	const [selectedResult, setSelectedResult] = useState<Submission | null>(
 		null
 	);
+	const [searchQuery, setSearchQuery] = useState("");
+	const detailsRef = useRef<HTMLDivElement | null>(null);
+	const [loading, setLoading] = useState(true);
+	const { toast } = useToast();
 
-	const course = mockCourses.find((c) => c.id === courseId);
-	const results = courseId ? mockResults[courseId] || [] : [];
+	// Scroll to detailed results when selectedResult changes
+	useEffect(() => {
+		if (selectedResult && detailsRef.current) {
+			detailsRef.current.scrollIntoView({ behavior: "smooth" });
+		}
+	}, [selectedResult]);
+
+	// Filter submissions based on search query
+	const filteredSubmissions = useMemo(() => {
+		if (!course?.submissions) return [];
+
+		if (!searchQuery.trim()) {
+			return course.submissions;
+		}
+
+		const query = searchQuery.toLowerCase();
+		return course.submissions.filter(
+			(submission) =>
+				submission.studentName.toLowerCase().includes(query) ||
+				submission.studentId.toString().includes(query)
+		);
+	}, [course?.submissions, searchQuery]);
+
+	const fetchCourseSubmissions = async () => {
+		try {
+			setLoading(true);
+			const response = await axios.get(
+				`http://localhost:8000/api/user/course/${courseCode}`,
+				{
+					params: {
+						id: JSON.parse(localStorage.getItem("user")),
+					},
+				}
+			);
+
+			if (response.data) {
+				setCourse(response.data);
+			}
+		} catch (error) {
+			toast({
+				title: "Unexpected Error",
+				description: "An unexpected error occurred. Please try again.",
+				variant: "destructive",
+			});
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	useEffect(() => {
+		fetchCourseSubmissions();
+	}, []);
 
 	const getGradeColor = (grade: string) => {
 		switch (grade) {
@@ -250,11 +149,13 @@ const CourseResults = () => {
 		}
 	};
 
-	const averageScore =
-		results.length > 0
-			? results.reduce((sum, result) => sum + result.percentage, 0) /
-			  results.length
-			: 0;
+	if (loading) {
+		return (
+			<div className="flex flex-col min-h-screen justify-center items-center">
+				<Spinner />
+			</div>
+		);
+	}
 
 	if (!course) {
 		return (
@@ -279,7 +180,7 @@ const CourseResults = () => {
 								<p className="text-muted-foreground mb-4">
 									The course you're looking for doesn't exist.
 								</p>
-								<Link to="/results">
+								<Link to="/submissions">
 									<Button>
 										<ArrowLeft className="mr-2 h-4 w-4" />
 										Back to Courses
@@ -302,7 +203,7 @@ const CourseResults = () => {
 						<SidebarTrigger />
 						<div>
 							<div className="flex items-center gap-2 mb-1">
-								<Link to="/results">
+								<Link to="/submissions">
 									<Button variant="ghost" size="sm">
 										<ArrowLeft className="h-4 w-4 mr-2" />
 										Back to Courses
@@ -310,10 +211,10 @@ const CourseResults = () => {
 								</Link>
 							</div>
 							<h1 className="text-2xl font-bold text-foreground">
-								{course.courseCode} Results
+								{course?.courseCode} Results
 							</h1>
 							<p className="text-muted-foreground">
-								{course.courseName}
+								{course?.courseName}
 							</p>
 						</div>
 					</div>
@@ -342,7 +243,7 @@ const CourseResults = () => {
 						</CardHeader>
 						<CardContent>
 							<div className="text-2xl font-bold">
-								{results.length}
+								{course?.totalSubmissions || 0}
 							</div>
 						</CardContent>
 					</Card>
@@ -354,7 +255,7 @@ const CourseResults = () => {
 						</CardHeader>
 						<CardContent>
 							<div className="text-2xl font-bold">
-								{averageScore.toFixed(1)}%
+								{Number(course?.averageScore).toFixed(1)}%
 							</div>
 						</CardContent>
 					</Card>
@@ -366,12 +267,7 @@ const CourseResults = () => {
 						</CardHeader>
 						<CardContent>
 							<div className="text-2xl font-bold">
-								{results.length > 0
-									? Math.max(
-											...results.map((r) => r.percentage)
-									  )
-									: 0}
-								%
+								{course?.highestScore || 0}
 							</div>
 						</CardContent>
 					</Card>
@@ -383,16 +279,7 @@ const CourseResults = () => {
 						</CardHeader>
 						<CardContent>
 							<div className="text-2xl font-bold">
-								{results.length > 0
-									? (
-											(results.filter(
-												(r) => r.percentage >= 60
-											).length /
-												results.length) *
-											100
-									  ).toFixed(0)
-									: 0}
-								%
+								{course?.passRate || 0}%
 							</div>
 						</CardContent>
 					</Card>
@@ -401,14 +288,31 @@ const CourseResults = () => {
 				{/* Results Table */}
 				<Card>
 					<CardHeader>
-						<CardTitle>Student Results</CardTitle>
-						<CardDescription>
-							Results for {course.courseCode} -{" "}
-							{course.courseName}
-						</CardDescription>
+						<div className="flex items-center justify-between">
+							<div>
+								<CardTitle>Student Results</CardTitle>
+								<CardDescription>
+									Results for {course?.courseCode} -{" "}
+									{course?.courseName}
+								</CardDescription>
+							</div>
+							<div className="flex items-center gap-2 w-full max-w-sm">
+								<div className="relative flex-1">
+									<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+									<Input
+										placeholder="Search students..."
+										value={searchQuery}
+										onChange={(e) =>
+											setSearchQuery(e.target.value)
+										}
+										className="pl-10"
+									/>
+								</div>
+							</div>
+						</div>
 					</CardHeader>
 					<CardContent>
-						{results.length === 0 ? (
+						{course && course?.submissions.length === 0 ? (
 							<div className="text-center py-12">
 								<p className="text-muted-foreground mb-4">
 									No student submissions found for this
@@ -417,6 +321,18 @@ const CourseResults = () => {
 								<Link to="/upload">
 									<Button>Upload Answer Sheets</Button>
 								</Link>
+							</div>
+						) : filteredSubmissions.length === 0 && searchQuery ? (
+							<div className="text-center py-12">
+								<p className="text-muted-foreground mb-4">
+									No students found matching "{searchQuery}".
+								</p>
+								<Button
+									variant="outline"
+									onClick={() => setSearchQuery("")}
+								>
+									Clear Search
+								</Button>
 							</div>
 						) : (
 							<Table>
@@ -432,7 +348,7 @@ const CourseResults = () => {
 									</TableRow>
 								</TableHeader>
 								<TableBody>
-									{results.map((result) => (
+									{filteredSubmissions.map((result) => (
 										<TableRow key={result.id}>
 											<TableCell className="font-medium">
 												{result.studentName}
@@ -442,7 +358,7 @@ const CourseResults = () => {
 											</TableCell>
 											<TableCell>
 												{result.score}/
-												{result.totalQuestions}
+												{course?.numOfQuestions}
 											</TableCell>
 											<TableCell>
 												{result.percentage}%
@@ -482,13 +398,13 @@ const CourseResults = () => {
 
 				{/* Detailed View Modal */}
 				{selectedResult && (
-					<Card>
+					<Card ref={detailsRef}>
 						<CardHeader>
 							<div className="flex items-center justify-between">
 								<div>
 									<CardTitle>
 										Detailed Results:{" "}
-										{selectedResult.studentName}
+										{selectedResult?.studentName}
 									</CardTitle>
 									<CardDescription>
 										Question-by-question analysis
@@ -504,49 +420,57 @@ const CourseResults = () => {
 						</CardHeader>
 						<CardContent>
 							<div className="grid grid-cols-5 md:grid-cols-10 gap-2 mb-4">
-								{selectedResult.answers.map((answer, index) => (
-									<div key={index} className="text-center">
-										<div className="text-xs text-muted-foreground mb-1">
-											Q{index + 1}
-										</div>
-										<div
-											className={`w-8 h-8 rounded flex items-center justify-center text-sm font-medium ${
-												answer ===
-												selectedResult.correctAnswers[
-													index
-												]
-													? "bg-green-100 text-green-800"
-													: "bg-red-100 text-red-800"
-											}`}
-										>
-											{answer}
-										</div>
-										<div className="text-xs mt-1">
-											{answer ===
-											selectedResult.correctAnswers[
-												index
-											] ? (
-												<CheckCircle className="h-3 w-3 text-green-600 mx-auto" />
-											) : (
-												<XCircle className="h-3 w-3 text-red-600 mx-auto" />
-											)}
-										</div>
-									</div>
-								))}
+								{selectedResult &&
+									selectedResult?.answers.length !== 0 &&
+									selectedResult?.answers.map(
+										(answer, index) => (
+											<div
+												key={index}
+												className="text-center"
+											>
+												<div className="text-xs text-muted-foreground mb-1">
+													Q{index + 1}
+												</div>
+												<div
+													className={`w-8 h-8 rounded flex items-center justify-center text-sm font-medium ${
+														answer ===
+														course?.correctAnswers[
+															index
+														]
+															? "bg-green-100 text-green-800"
+															: "bg-red-100 text-red-800"
+													}`}
+												>
+													{answer}
+												</div>
+												<div className="text-xs mt-1">
+													{answer ===
+													course?.correctAnswers[
+														index
+													] ? (
+														<CheckCircle className="h-3 w-3 text-green-600 mx-auto" />
+													) : (
+														<XCircle className="h-3 w-3 text-red-600 mx-auto" />
+													)}
+												</div>
+											</div>
+										)
+									)}
 							</div>
 							<div className="flex justify-between items-center pt-4 border-t">
 								<div className="text-sm text-muted-foreground">
-									Correct: {selectedResult.score} | Incorrect:{" "}
-									{selectedResult.totalQuestions -
-										selectedResult.score}
+									Correct: {selectedResult?.score} |
+									Incorrect:{" "}
+									{course?.numOfQuestions -
+										selectedResult?.score}
 								</div>
 								<Badge
 									className={getGradeColor(
-										selectedResult.grade
+										selectedResult?.grade
 									)}
 								>
-									Final Grade: {selectedResult.grade} (
-									{selectedResult.percentage}%)
+									Final Grade: {selectedResult?.grade} (
+									{selectedResult?.percentage}%)
 								</Badge>
 							</div>
 						</CardContent>
@@ -557,4 +481,4 @@ const CourseResults = () => {
 	);
 };
 
-export default CourseResults;
+export default CourseSubmissions;

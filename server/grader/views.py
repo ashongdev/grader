@@ -58,7 +58,7 @@ def save_answer_key(request):
         # Insert answer key
         a = AnswerKey(
             author=user,
-            course_code=course_code,
+            course_code=course_code.upper(),
             no_of_questions=num_of_questions,
             grading_scale=grading_scale,
             keys=answer_key,
@@ -96,12 +96,152 @@ def get_grade(score):
         return "F"
 
 
+@api_view(["GET"])
+def fetch_course_submissions(request, course_code):
+    course_code = course_code.upper()
+    author = request.query_params.get("id")
+    submissions = Submission.objects.filter(
+        associated_with__author__username=author,
+        associated_with__course_code=course_code,
+    )
+    total_score = 0
+
+    scores = []
+
+    course = AnswerKey.objects.get(author__username=author, course_code=course_code)  # type: ignore
+    no_of_questions = course.no_of_questions
+
+    course_percentage_sum = 0
+    pass_count = 0
+
+    all_submissions = []
+
+    student_answers = []
+    correct_answers = []
+    for key in course.keys:
+        correct_answers.append(key)
+
+    for submission in submissions:
+        j = 0
+        student_answers = []
+        while j < len(correct_answers):
+            student_answers.append(submission.answers[j])
+            j += 1
+
+        all_submissions.append(
+            {
+                "id": submission.id,  # type: ignore
+                "studentId": submission.student_id,
+                "studentName": submission.student_name,
+                "score": submission.score,
+                "percentage": submission.percentage,
+                "timeProcessed": submission.updated_at.strftime("%d/%m/%Y"),
+                "grade": submission.grade,
+                "answers": student_answers,
+            }
+        )
+        scores.append(submission.score)
+        total_score += submission.score
+
+        percent_score = (submission.score / no_of_questions) * 100
+        course_percentage_sum += percent_score
+
+        if submission.grade in ["A", "B", "C", "D", "E"]:
+            pass_count += 1
+
+    passRate = (pass_count / len(submissions)) * 100 if len(submissions) else 0
+    course_avg = course_percentage_sum / len(submissions)
+
+    return Response(
+        {
+            "courseName": course.course_name,
+            "courseCode": course.course_code,
+            "totalSubmissions": len(submissions.all()),
+            "averageScore": f"{course_avg:.2f}",
+            "highestScore": max(scores),
+            "passRate": passRate,
+            "submissions": all_submissions,
+            "numOfQuestions": no_of_questions,
+            "correctAnswers": correct_answers,
+        },
+        status=200,
+    )
+
+
+@api_view(["GET"])
+def fetch_all_submissions(request):
+    author = request.query_params.get("id")
+
+    # Get all submissions and courses for this author
+    total_submissions = Submission.objects.filter(
+        associated_with__author__username=author
+    ).all()
+
+    courses = AnswerKey.objects.filter(author__username=author).all()
+
+    total_percentages = 0
+    total_submissions_count = 0
+    course_list = []
+
+    for course in courses:
+        submissions = Submission.objects.filter(associated_with_id=course.id).all()  # type: ignore
+
+        if not submissions:
+            continue  # Skip if no submissions
+
+        last_submission = submissions.order_by("-updated_at").first()
+        last_activity = (
+            last_submission.updated_at.strftime("%d/%m/%Y")
+            if last_submission
+            else "N/A"
+        )
+
+        max_score = course.no_of_questions
+
+        course_percentage_sum = 0
+
+        for submission in submissions:
+            percent_score = (submission.score / max_score) * 100
+            course_percentage_sum += percent_score
+
+        course_avg = course_percentage_sum / len(submissions)
+
+        course_list.append(
+            {
+                "id": course.id,  # type: ignore
+                "courseCode": course.course_code,
+                "courseName": course.course_name,
+                "totalSubmissions": len(submissions),
+                "lastActivity": last_activity,
+                "averageScore": f"{course_avg:.2f}",
+            }
+        )
+
+        total_percentages += course_percentage_sum
+        total_submissions_count += len(submissions)
+
+    if total_submissions_count > 0:
+        overall_avg = total_percentages / total_submissions_count
+    else:
+        overall_avg = 0.0
+
+    return Response(
+        {
+            "totalSubmissions": len(total_submissions),
+            "totalCourses": len(courses),
+            "overallAverage": f"{overall_avg:.2f}",
+            "courseList": course_list,
+        },
+        status=200,
+    )
+
+
 @api_view(["POST"])
 def save_students_answers(request):
     students_data = request.data.get("students")
     course_code = request.data.get("course_code")
 
-    if not students_data:
+    if not students_data or not course_code:
         return Response({"error": "Missing cleanAnswerKey"}, status=400)
 
     try:
@@ -292,8 +432,7 @@ def register(request):
     try:
         user = User.objects.create_user(email, email, password)
         user.save()
-    except IntegrityError as e:
-        print(e)
+    except IntegrityError:
         return Response({"message": "Email address already taken."}, status=403)
 
     login(request, user)

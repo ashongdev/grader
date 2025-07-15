@@ -15,7 +15,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Search } from "lucide-react";
-import { useState } from "react";
+import { Dispatch, SetStateAction, useState } from "react";
 
 interface Course {
 	id: string;
@@ -32,17 +32,17 @@ interface Course {
 }
 
 interface CourseSelectorProps {
-	selectedCourse: string;
-	onCourseChange: (courseId: string) => void;
+	selectedCourse: Course | null;
 	required?: boolean;
 	courses: Course[];
+	setSelectedCourse: Dispatch<SetStateAction<Course | null>>;
 }
 
 const CourseSelector = ({
 	selectedCourse,
-	onCourseChange,
 	courses,
 	required = true,
+	setSelectedCourse,
 }: CourseSelectorProps) => {
 	const [searchTerm, setSearchTerm] = useState("");
 
@@ -84,15 +84,23 @@ const CourseSelector = ({
 				<div className="space-y-2">
 					<Label htmlFor="course-select">Available Courses</Label>
 					<Select
-						value={selectedCourse}
-						onValueChange={onCourseChange}
+						value={selectedCourse?.id ?? ""}
+						onValueChange={(courseId) => {
+							const course = courses.find(
+								(c) => c.id === courseId
+							);
+							if (course) setSelectedCourse(course);
+						}}
 					>
 						<SelectTrigger id="course-select">
 							<SelectValue placeholder="Select a course..." />
 						</SelectTrigger>
 						<SelectContent>
 							{filteredCourses.map((course) => (
-								<SelectItem key={course.id} value={course.id}>
+								<SelectItem
+									key={`${course.id}-${course.courseCode}`}
+									value={course.id}
+								>
 									<div className="flex flex-col">
 										<span className="font-medium">
 											{course.courseCode} -{" "}
@@ -113,7 +121,7 @@ const CourseSelector = ({
 						<div className="mt-1">
 							{(() => {
 								const course = courses.find(
-									(c) => c.id === selectedCourse
+									(c) => c.id === selectedCourse.id
 								);
 								return course ? (
 									<div>

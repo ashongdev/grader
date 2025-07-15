@@ -49,9 +49,13 @@ interface Course {
 const Upload = () => {
 	const [files, setFiles] = useState<UploadedFile[]>([]);
 	const [isDragOver, setIsDragOver] = useState(false);
-	const [selectedCourse, setSelectedCourse] = useState("");
+	const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
 	const [courses, setCourses] = useState<Course[]>([]);
 	const { toast } = useToast();
+
+	useEffect(() => {
+		console.log(selectedCourse);
+	}, [selectedCourse]);
 
 	const handleDragOver = useCallback((e: React.DragEvent) => {
 		e.preventDefault();
@@ -378,6 +382,7 @@ const Upload = () => {
 						<ManualAnswerInput
 							selectedCourse={selectedCourse}
 							courses={courses}
+							setSelectedCourse={setSelectedCourse}
 						/>
 					</TabsContent>{" "}
 				</Tabs>
@@ -386,7 +391,7 @@ const Upload = () => {
 				<CourseSelector
 					selectedCourse={selectedCourse}
 					courses={courses}
-					onCourseChange={setSelectedCourse}
+					setSelectedCourse={setSelectedCourse}
 				/>
 			</div>
 		</div>

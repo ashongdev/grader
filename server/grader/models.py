@@ -9,7 +9,7 @@ class User(AbstractUser):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.username} (User ID: {self.id})"
+        return f"{self.username} (User ID: {self.id})"  # type: ignore
 
 
 class AnswerKey(models.Model):

@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import axios from "axios";
 import { Plus, Save, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Dispatch, SetStateAction, useEffect, useState } from "react";
 
 interface StudentAnswer {
 	id: string;
@@ -35,15 +35,16 @@ interface Course {
 
 interface ManualAnswerInputProps {
 	courses: Course[];
-	selectedCourse: string;
+	selectedCourse: Course | null;
+	setSelectedCourse: Dispatch<SetStateAction<Course | null>>;
 }
 
 const ManualAnswerInput = ({
-	selectedCourse: selectedCourseId,
+	selectedCourse,
 	courses,
+	setSelectedCourse,
 }: ManualAnswerInputProps) => {
 	const [students, setStudents] = useState<StudentAnswer[]>([]);
-	const [selectedCourse, setSelectedCourse] = useState<Course>();
 	const [newStudent, setNewStudent] = useState({
 		studentId: "",
 		studentName: "",
@@ -52,17 +53,17 @@ const ManualAnswerInput = ({
 	const { toast } = useToast();
 
 	useEffect(() => {
-		if (selectedCourseId) {
-			const findCourse = courses.find((c) => (c.id = selectedCourseId));
+		if (selectedCourse) {
+			const findCourse = courses.find((c) => c.id === selectedCourse.id);
 
 			if (findCourse) {
 				setSelectedCourse(findCourse);
 			}
 		}
-	}, [selectedCourseId]);
+	}, [selectedCourse]);
 
 	const addStudent = () => {
-		if (!selectedCourseId) {
+		if (!selectedCourse) {
 			toast({
 				title: "Course Required",
 				description:
@@ -124,7 +125,7 @@ const ManualAnswerInput = ({
 	};
 
 	const saveAllAnswers = async () => {
-		if (!selectedCourseId) {
+		if (!selectedCourse) {
 			toast({
 				title: "Course Required",
 				description: "Please select a course before saving answers.",
@@ -177,7 +178,7 @@ const ManualAnswerInput = ({
 				<CardDescription>
 					Enter student answers manually. Use format like "ABCD" or
 					"1234" for multiple choice answers.
-					{!selectedCourseId && (
+					{!selectedCourse && (
 						<span className="block mt-2 text-destructive font-medium">
 							Please select a course first to add student answers.
 						</span>
@@ -188,9 +189,7 @@ const ManualAnswerInput = ({
 				{/* Add New Student Form */}
 				<div
 					className={`grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg ${
-						!selectedCourseId
-							? "opacity-50 pointer-events-none"
-							: ""
+						!selectedCourse ? "opacity-50 pointer-events-none" : ""
 					}`}
 				>
 					<div>
@@ -244,7 +243,7 @@ const ManualAnswerInput = ({
 						<Button
 							onClick={addStudent}
 							className="w-full"
-							disabled={!selectedCourseId}
+							disabled={!selectedCourse}
 						>
 							<Plus className="h-4 w-4 mr-2" />
 							Add Student
