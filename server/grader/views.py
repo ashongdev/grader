@@ -3,7 +3,7 @@ from django.db import IntegrityError
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .models import AnswerKey, Setting, User
+from .models import AnswerKey, Setting, Submission, User
 
 
 # Create your views here.
@@ -79,6 +79,81 @@ def save_answer_key(request):
             s.save()
 
             return Response({"message": "Saved successfully"}, status=201)
+
+
+def get_grade(score):
+    if score >= 90:
+        return "A"
+    elif score >= 80:
+        return "B"
+    elif score >= 70:
+        return "C"
+    elif score >= 60:
+        return "D"
+    elif score >= 50:
+        return "E"
+    else:
+        return "F"
+
+
+@api_view(["POST"])
+def save_students_answers(request):
+    students_data = request.data.get("students")
+    course_code = request.data.get("course_code")
+
+    if not students_data:
+        return Response({"error": "Missing cleanAnswerKey"}, status=400)
+
+    try:
+        a = AnswerKey.objects.get(course_code=course_code)
+        s = Setting.objects.get(answer_key=a)
+    except (AnswerKey.DoesNotExist, Setting.DoesNotExist):
+        pass
+    else:
+        for student in students_data:
+            student_answers = student["answers"]
+            correct_answers = a.keys
+
+            j = 0
+            score = 0
+            while j < len(correct_answers):
+                # If correct
+                if student_answers[j].upper() == correct_answers[j].upper():
+                    score = score + 1
+                else:
+                    # If negative marking is True: Deduct score
+                    if s.negative_marking:
+                        if score > s.points_deducted:
+                            score = score - s.points_deducted
+                    else:
+                        pass
+
+                j = j + 1
+
+            if a.no_of_questions == 0:
+                percentage = 0
+                grade = get_grade(percentage)
+            else:
+                percentage = round((score / a.no_of_questions) * 100, 2)
+                grade = get_grade(percentage)
+
+            student_id = student["studentId"]
+            student_name = student["studentName"]
+
+            # Save to submissions
+            # todo: Check if user exists then update answer key
+            su = Submission(
+                student_id=student_id,
+                student_name=student_name,
+                associated_with=a,
+                answers=student_answers,
+                score=score,
+                percentage=percentage,
+                grade=grade,
+            )
+            su.save()
+
+        return Response({"message": "Saved successfully"}, status=201)
 
 
 @api_view(["GET"])

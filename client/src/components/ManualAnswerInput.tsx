@@ -9,8 +9,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import axios from "axios";
 import { Plus, Save, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface StudentAnswer {
 	id: string;
@@ -18,13 +19,31 @@ interface StudentAnswer {
 	studentName: string;
 	answers: string;
 }
+interface Course {
+	id: string;
+	courseCode: string;
+	courseName: string;
+	answerKey: string;
+	dateAdded: Date;
+	gradingScale: "STD" | "NUM" | "CUS";
+	markPerQuestion: number;
+	negativeMarking: boolean;
+	numQuestions: number;
+	totalMarks: number;
+	updatedAt: Date;
+}
 
 interface ManualAnswerInputProps {
+	courses: Course[];
 	selectedCourse: string;
 }
 
-const ManualAnswerInput = ({ selectedCourse }: ManualAnswerInputProps) => {
+const ManualAnswerInput = ({
+	selectedCourse: selectedCourseId,
+	courses,
+}: ManualAnswerInputProps) => {
 	const [students, setStudents] = useState<StudentAnswer[]>([]);
+	const [selectedCourse, setSelectedCourse] = useState<Course>();
 	const [newStudent, setNewStudent] = useState({
 		studentId: "",
 		studentName: "",
@@ -32,12 +51,31 @@ const ManualAnswerInput = ({ selectedCourse }: ManualAnswerInputProps) => {
 	});
 	const { toast } = useToast();
 
+	useEffect(() => {
+		if (selectedCourseId) {
+			const findCourse = courses.find((c) => (c.id = selectedCourseId));
+
+			if (findCourse) {
+				setSelectedCourse(findCourse);
+			}
+		}
+	}, [selectedCourseId]);
+
 	const addStudent = () => {
-		if (!selectedCourse) {
+		if (!selectedCourseId) {
 			toast({
 				title: "Course Required",
 				description:
 					"Please select a course before adding student answers.",
+				variant: "destructive",
+			});
+			return;
+		}
+
+		if (newStudent.answers.length !== selectedCourse?.numQuestions) {
+			toast({
+				title: "Validation Error",
+				description: `Answer key must contain exactly ${selectedCourse?.numQuestions} answers (A, B, C, or D).`,
 				variant: "destructive",
 			});
 			return;
@@ -85,8 +123,8 @@ const ManualAnswerInput = ({ selectedCourse }: ManualAnswerInputProps) => {
 		);
 	};
 
-	const saveAllAnswers = () => {
-		if (!selectedCourse) {
+	const saveAllAnswers = async () => {
+		if (!selectedCourseId) {
 			toast({
 				title: "Course Required",
 				description: "Please select a course before saving answers.",
@@ -104,17 +142,32 @@ const ManualAnswerInput = ({ selectedCourse }: ManualAnswerInputProps) => {
 			return;
 		}
 
-		// Here you would typically send the data to your backend with course ID
-		console.log(
-			"Saving student answers for course:",
-			selectedCourse,
-			students
-		);
+		try {
+			const response = await axios.post(
+				"http://localhost:8000/api/user/save-answers",
+				{
+					students,
+					course_code: selectedCourse.courseCode,
+				}
+			);
 
-		toast({
-			title: "Answers Saved",
-			description: `${students.length} student answer(s) have been saved successfully.`,
-		});
+			if (response.data) {
+				toast({
+					title: "Answers Saved",
+					description: `${students.length} student answer(s) have been saved successfully.`,
+				});
+			}
+		} catch (error) {
+			toast({
+				title: "Unexpected Error",
+				description: "An unexpected error occurred. Please try again.",
+				variant: "destructive",
+			});
+		}
+	};
+
+	const formatAnswerKey = (value: string) => {
+		return value.replace(/[^ABCD ]/gi, "").toUpperCase();
 	};
 
 	return (
@@ -122,9 +175,9 @@ const ManualAnswerInput = ({ selectedCourse }: ManualAnswerInputProps) => {
 			<CardHeader>
 				<CardTitle>Manual Answer Input</CardTitle>
 				<CardDescription>
-					Enter student answers manually. Use format like "A,B,C,D" or
-					"1,2,3,4" for multiple choice answers.
-					{!selectedCourse && (
+					Enter student answers manually. Use format like "ABCD" or
+					"1234" for multiple choice answers.
+					{!selectedCourseId && (
 						<span className="block mt-2 text-destructive font-medium">
 							Please select a course first to add student answers.
 						</span>
@@ -135,7 +188,9 @@ const ManualAnswerInput = ({ selectedCourse }: ManualAnswerInputProps) => {
 				{/* Add New Student Form */}
 				<div
 					className={`grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg ${
-						!selectedCourse ? "opacity-50 pointer-events-none" : ""
+						!selectedCourseId
+							? "opacity-50 pointer-events-none"
+							: ""
 					}`}
 				>
 					<div>
@@ -171,20 +226,25 @@ const ManualAnswerInput = ({ selectedCourse }: ManualAnswerInputProps) => {
 						<Input
 							id="answers"
 							value={newStudent.answers}
-							onChange={(e) =>
+							maxLength={selectedCourse?.numQuestions}
+							onChange={(e) => {
+								const formatted = formatAnswerKey(
+									e.target.value
+								);
+
 								setNewStudent((prev) => ({
 									...prev,
-									answers: e.target.value,
-								}))
-							}
-							placeholder="A,B,C,D or 1,2,3,4"
+									answers: formatted,
+								}));
+							}}
+							placeholder="e.g., ABCD or 1234"
 						/>
 					</div>
 					<div className="md:col-span-3">
 						<Button
 							onClick={addStudent}
 							className="w-full"
-							disabled={!selectedCourse}
+							disabled={!selectedCourseId}
 						>
 							<Plus className="h-4 w-4 mr-2" />
 							Add Student
@@ -274,7 +334,8 @@ const ManualAnswerInput = ({ selectedCourse }: ManualAnswerInputProps) => {
 					<h4 className="font-medium mb-2">Instructions:</h4>
 					<ul className="text-sm text-muted-foreground space-y-1">
 						<li>
-							• Enter answers separated by commas (e.g., A,B,C,D)
+							• Enter answers without commas (e.g., "ABCD" or
+							"1234")
 						</li>
 						<li>• Use consistent format for all students</li>
 						<li>• Student ID should be unique for each student</li>

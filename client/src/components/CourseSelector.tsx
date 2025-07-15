@@ -21,35 +21,32 @@ interface Course {
 	id: string;
 	courseCode: string;
 	courseName: string;
+	answerKey: string;
+	dateAdded: Date;
+	gradingScale: "STD" | "NUM" | "CUS";
+	markPerQuestion: number;
+	negativeMarking: boolean;
+	numQuestions: number;
+	totalMarks: number;
+	updatedAt: Date;
 }
 
 interface CourseSelectorProps {
 	selectedCourse: string;
 	onCourseChange: (courseId: string) => void;
 	required?: boolean;
+	courses: Course[];
 }
-
-// Mock courses - in real app this would come from API
-const mockCourses: Course[] = [
-	{
-		id: "1",
-		courseCode: "CS101",
-		courseName: "Introduction to Computer Science",
-	},
-	{ id: "2", courseCode: "MATH201", courseName: "Calculus II" },
-	{ id: "3", courseCode: "PHYS301", courseName: "Advanced Physics" },
-	{ id: "4", courseCode: "ENG102", courseName: "English Composition" },
-	{ id: "5", courseCode: "HIST201", courseName: "World History" },
-];
 
 const CourseSelector = ({
 	selectedCourse,
 	onCourseChange,
+	courses,
 	required = true,
 }: CourseSelectorProps) => {
 	const [searchTerm, setSearchTerm] = useState("");
 
-	const filteredCourses = mockCourses.filter(
+	const filteredCourses = courses.filter(
 		(course) =>
 			course.courseCode
 				.toLowerCase()
@@ -98,9 +95,7 @@ const CourseSelector = ({
 								<SelectItem key={course.id} value={course.id}>
 									<div className="flex flex-col">
 										<span className="font-medium">
-											{course.courseCode}
-										</span>
-										<span className="text-sm text-muted-foreground">
+											{course.courseCode} -{" "}
 											{course.courseName}
 										</span>
 									</div>
@@ -117,7 +112,7 @@ const CourseSelector = ({
 						</span>
 						<div className="mt-1">
 							{(() => {
-								const course = mockCourses.find(
+								const course = courses.find(
 									(c) => c.id === selectedCourse
 								);
 								return course ? (

@@ -44,6 +44,14 @@ interface Course {
 	id: string;
 	courseCode: string;
 	courseName: string;
+	// answerKey: string;
+	// dateAdded: Date;
+	// gradingScale: "STD" | "NUM" | "CUS";
+	// markPerQuestion: number;
+	// negativeMarking: boolean;
+	// numQuestions: number;
+	// totalMarks: number;
+	// updatedAt: Date;
 }
 
 // Mock data - in real app this would come from API

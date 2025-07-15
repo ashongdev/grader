@@ -104,6 +104,7 @@ const SetAnswerKey = () => {
 					title: "Answer Key Saved",
 					description: `Answer key for ${data.courseCode} has been saved successfully.`,
 				});
+				form.reset();
 			}
 		} catch (error) {
 			const message =
@@ -118,8 +119,6 @@ const SetAnswerKey = () => {
 				variant: "destructive",
 			});
 		}
-		// Optionally reset form here
-		// form.reset();
 	};
 
 	const generateRandomKey = () => {
@@ -386,8 +385,7 @@ const SetAnswerKey = () => {
 											</FormControl>
 											<FormDescription>
 												Enter answers as a sequence of
-												letters (A, B, C, D). Current
-												length:{" "}
+												letters (ABCD). Current length:{" "}
 												{
 													formatAnswerKey(
 														watchedAnswerKey

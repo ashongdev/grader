@@ -17,12 +17,16 @@ import {
 } from "@/components/ui/select";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Switch } from "@/components/ui/switch";
+import { useFontSize } from "@/hooks/use-font-size";
+import { useTheme } from "@/hooks/use-theme";
 import { useToast } from "@/hooks/use-toast";
 import { Bell, BookOpen, Eye, Save, Shield, User } from "lucide-react";
 import { useState } from "react";
 
 const Settings = () => {
 	const { toast } = useToast();
+	const { theme, setTheme } = useTheme();
+	const { fontSize, setFontSize } = useFontSize();
 
 	// Profile settings
 	const [firstName, setFirstName] = useState("John");
@@ -31,8 +35,6 @@ const Settings = () => {
 	const [institution, setInstitution] = useState("Sample University");
 
 	// Appearance settings
-	const [theme, setTheme] = useState("system");
-	const [fontSize, setFontSize] = useState("medium");
 	const [language, setLanguage] = useState("en");
 
 	// Grading preferences
@@ -107,6 +109,7 @@ const Settings = () => {
 								id="email"
 								type="email"
 								value={email}
+								disabled
 								onChange={(e) => setEmail(e.target.value)}
 							/>
 						</div>
@@ -316,6 +319,16 @@ const Settings = () => {
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-4">
+						<CardHeader>
+							<CardTitle className="flex items-center gap-2">
+								<Shield className="h-5 w-5" />
+								Privacy & Security
+							</CardTitle>
+							<CardDescription>
+								Control your privacy and data sharing
+								preferences
+							</CardDescription>
+						</CardHeader>
 						<div className="space-y-2">
 							<Label>Profile Visibility</Label>
 							<Select

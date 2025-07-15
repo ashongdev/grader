@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import axios from "axios";
 import {
 	CheckCircle,
 	FileImage,
@@ -19,7 +20,7 @@ import {
 	Upload as UploadIcon,
 	X,
 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 // ... keep existing code (UploadedFile interface)
 interface UploadedFile {
@@ -31,10 +32,25 @@ interface UploadedFile {
 	progress: number;
 }
 
+interface Course {
+	id: string;
+	courseCode: string;
+	courseName: string;
+	answerKey: string;
+	dateAdded: Date;
+	gradingScale: "STD" | "NUM" | "CUS";
+	markPerQuestion: number;
+	negativeMarking: boolean;
+	numQuestions: number;
+	totalMarks: number;
+	updatedAt: Date;
+}
+
 const Upload = () => {
 	const [files, setFiles] = useState<UploadedFile[]>([]);
 	const [isDragOver, setIsDragOver] = useState(false);
 	const [selectedCourse, setSelectedCourse] = useState("");
+	const [courses, setCourses] = useState<Course[]>([]);
 	const { toast } = useToast();
 
 	const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -131,6 +147,38 @@ const Upload = () => {
 		const i = Math.floor(Math.log(bytes) / Math.log(k));
 		return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 	};
+
+	const fetchAnswerKeys = async () => {
+		try {
+			const email = JSON.parse(localStorage.getItem("user"));
+			const response = await axios.get(
+				`http://localhost:8000/api/user/keys/${email}`
+			);
+			if (response.data) {
+				setCourses(response.data);
+			}
+		} catch (error) {
+			const { message } = error.response.data;
+
+			console.log("🚀 ~ onSubmit ~ error:", error);
+			if (error.status === 400) {
+				toast({
+					title: `Status: ${error.status}`,
+					description: message,
+				});
+				return;
+			}
+
+			toast({
+				title: `Status: ${error.status}`,
+				description: `${message}`,
+			});
+		}
+	};
+	useEffect(() => {
+		fetchAnswerKeys();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	return (
 		<div className="flex flex-col min-h-screen">
@@ -327,13 +375,17 @@ const Upload = () => {
 						</Card>
 					</TabsContent>
 					<TabsContent value="manual" className="space-y-6">
-						<ManualAnswerInput selectedCourse={selectedCourse} />
+						<ManualAnswerInput
+							selectedCourse={selectedCourse}
+							courses={courses}
+						/>
 					</TabsContent>{" "}
 				</Tabs>
 
 				{/* Course Selection */}
 				<CourseSelector
 					selectedCourse={selectedCourse}
+					courses={courses}
 					onCourseChange={setSelectedCourse}
 				/>
 			</div>

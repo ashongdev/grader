@@ -9,7 +9,7 @@ class User(AbstractUser):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.username
+        return f"{self.username} (User ID: {self.id})"
 
 
 class AnswerKey(models.Model):
@@ -49,7 +49,7 @@ class AnswerKey(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.course_code} by {self.author}"
+        return f"{self.course_code} - {self.course_name} | {self.no_of_questions} Qs | by {self.author.username}"
 
 
 class Setting(models.Model):
@@ -67,19 +67,28 @@ class Setting(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Settings for {self.answer_key}"
+        neg_mark = "Enabled" if self.negative_marking else "Disabled"
+        return (
+            f"Settings for {self.answer_key.course_code}: Negative Marking - {neg_mark}, "
+            f"Deduction: {self.points_deducted}"
+        )
 
 
 class Submission(models.Model):
-    student = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="submissions"
-    )
+    student_id = models.IntegerField(null=False, blank=False)
+    student_name = models.TextField(null=True, blank=True)
     associated_with = models.ForeignKey(
         AnswerKey, on_delete=models.CASCADE, related_name="submissions"
     )
     answers = models.TextField("Answer keys")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    score = models.FloatField(default=0)
+    percentage = models.FloatField(default=0.0)
+    grade = models.CharField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.student} → {self.associated_with.course_code}"
+        return (
+            f"{self.student_name or self.student_id} | {self.associated_with.course_code} | "
+            f"Score: {self.score} ({self.percentage}%) Grade: {self.grade}"
+        )

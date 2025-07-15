@@ -503,6 +503,9 @@ const ViewAnswerKeys = () => {
 															editForm.answerKey ||
 															""
 														}
+														maxLength={
+															editForm.numQuestions
+														}
 														onChange={(e) =>
 															setEditForm({
 																...editForm,
